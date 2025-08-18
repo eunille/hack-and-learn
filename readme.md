@@ -19,6 +19,7 @@ I am building this portfolio to showcase my skills and growth as I prepare for i
 ## 👨‍💻 About Me  
 I am a cybersecurity enthusiast passionate about **offensive security, SOC operations, and ethical hacking**.  
 This repo documents my practical experience from CTFs, labs, and security projects.  
+but my focus is SOC Operation Defending
 
 ---
 
