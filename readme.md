@@ -1,7 +1,7 @@
 # 🔐 Cybersecurity Labs & Projects Portfolio  
 
 Welcome to my **Cybersecurity Journey Repository**.  
-This repo contains hands-on labs, projects, and documentation of my learning path in **penetration testing, SOC analysis, and ethical hacking**.  
+This repo contains hands-on labs, projects, and documentation of my learning path in **penetration testing, SOC analysis, practice and ethical hacking**.  
 
 I am building this portfolio to showcase my skills and growth as I prepare for internships and cybersecurity roles.  
 
