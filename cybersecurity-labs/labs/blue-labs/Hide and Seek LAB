@@ -1,0 +1,226 @@
+# TryHackMe — Hide and Seek
+
+*A clear, step-by-step documentation of the investigation, decoding steps (CyberChef), and final flag. Use this as your write-up for submission or personal notes.*
+
+---
+
+## Overview
+
+**Room:** TryHackMe — Hide and Seek
+
+**Goal:** Find post-compromise persistence and hidden data left on a Linux box, decode the hidden content (using CyberChef as the decoding tool), and obtain the flag.
+
+**Summary:** The investigation focuses on a non-standard systemd service (`cipher.service`), user home folders, user cron jobs, and the Message of the Day (MOTD) scripts. Encoded strings were discovered in unit files and cron entries and required chained decoding to recover clues and the final flag.
+
+---
+
+## Helpful note about encodings and CyberChef
+
+* For this box you used **CyberChef** to decode strings (Magic and manual recipes). CyberChef handled detection and layered decoding (Hex → Base64 → plaintext) comfortably.
+* Common command-line decodes are shown in the appendix, but note: **for the documentation you used CyberChef** and the steps below reference results from that tool.
+
+---
+
+## 1. Initial reconnaissance
+
+Run basic commands to get your bearings:
+
+```bash
+whoami
+id
+uname -a
+ps -eFH
+```
+
+`ps -eFH` lists running processes. Nothing looked suspicious initially.
+
+---
+
+## 2. Investigate systemd services
+
+List all services (use normal hyphens):
+
+```bash
+sudo systemctl list-units --all --type=service
+```
+
+Look for anything unusual. In this box you will notice `cipher.service` which is not a normal Ubuntu service.
+
+Check running services only:
+
+```bash
+sudo systemctl list-units --type=service --state=running
+```
+
+Check the `cipher.service` status:
+
+```bash
+sudo systemctl status cipher.service
+```
+
+You will see it is **inactive/deactivated** but the unit file exists — that is the artifact we will examine.
+
+---
+
+## 3. Read the service unit file
+
+Show the service file contents directly:
+
+```bash
+sudo systemctl cat cipher.service
+# or
+sudo cat /etc/systemd/system/cipher.service
+# or
+sudo cat /lib/systemd/system/cipher.service
+```
+
+Inside you will find encoded data (not a normal `ExecStart` binary path). Copy the suspicious encoded string(s) into CyberChef for decoding. In this write-up the **cipher.service** contained the string that decodes to the *4th part* of the flag.
+
+---
+
+## 4. Decode the encoded string(s (using CyberChef))
+
+You used CyberChef's **Magic** and manual recipes to decode the various strings found across the system. The important results and where they came from are listed below (this documents the exact pieces of the final flag and their source locations):
+
+* **First part (from root crontab):** `THM{y0`
+
+  * Command used to inspect: `sudo crontab -l -u root`
+  * Copy the encoded string from the crontab into CyberChef and decode.
+
+* **Second part (from `/home/zeroday/.ssh`):** `u_g0t_`
+
+  * Inspect `/home/zeroday` (use `sudo` if needed) and find the encoded data inside `.ssh` files.
+  * Decode in CyberChef to get the `u_g0t_` fragment.
+
+* **Third part (from `/home/specter/.bashrc`):** `3v3ryt`
+
+  * The `specter` user's `.bashrc` contains an encoded string; decoding yields `3v3ryt`.
+
+* **Fourth part (from `cipher.service` unit file):** `h1ng_`
+
+  * `sudo systemctl cat cipher.service` showed encoded content; CyberChef decoding produced `h1ng_`.
+
+* **Last part (from MOTD script):** `d0wn}`
+
+  * `sudo cat /etc/update-motd.d/00-header` (or the relevant MOTD script) contained or referenced the final encoded piece which decodes to `d0wn}`.
+
+When concatenated in the correct order, these fragments form the final flag found during the challenge:
+
+```
+THM{y0 u_g0t_ 3v3ryt h1ng_ d0wn}
+```
+
+(Condensed and without spaces as the actual flag you recorded: `THM{y0u_g0t_3v3ryth1ng_d0wn}` — replace with the exact flag string you captured during your run. The walkthrough example flag in the room is `THM{u_g0t_3v3ryt_h1ng_D0wn}` — use the flag you obtained.)
+
+> Note: keep the exact spacing and capitalization as the challenge expects; this section documents the source of each fragment and the CyberChef usage.
+
+---
+
+## 5. User enumeration & home directories
+
+Check system users and their UIDs to focus manual inspection on human accounts:
+
+```bash
+cat /etc/passwd | cut -d: -f1,3,6,7
+awk -F: '$3 >= 1000 {print $1}' /etc/passwd
+```
+
+List home directories and inspect hidden files with `sudo`:
+
+```bash
+ls -al /home
+sudo ls -al /home/zeroday
+sudo ls -al /home/specter
+```
+
+Look for `.ssh`, `.bashrc`, and other hidden files. Copy suspicious strings to CyberChef for decoding.
+
+---
+
+## 6. Check cron jobs
+
+Cron entries can contain encoded values. Inspect root and user crontabs:
+
+```bash
+sudo crontab -l -u root
+sudo crontab -l -u zeroday
+sudo crontab -l -u specter
+ls -al /etc/cron* /var/spool/cron/crontabs
+```
+
+If you find encoded data in a crontab, copy it into CyberChef and use Magic or manual recipes to decode. The root crontab in this instance contained the **first** fragment of the flag (`THM{y0`).
+
+---
+
+## 7. Check MOTD (Message of the Day)
+
+The MOTD scripts may be used to display information on login. Inspect them and decode any embedded or referenced strings.
+
+```bash
+ls -al /etc/update-motd.d/
+sudo cat /etc/update-motd.d/00-header
+```
+
+The MOTD script contained the final flag fragment `d0wn}` in this challenge.
+
+---
+
+## 8. Assemble the flag
+
+Collect the decoded fragments from each source in the order intended by the challenge:
+
+1. Root crontab → First part
+2. zeroday .ssh → Second part
+3. specter .bashrc → Third part
+4. cipher.service → Fourth part
+5. MOTD → Last part
+
+Concatenate the parts to form the final flag. Confirm the exact flag string you found during your run; the write-up here documents where each piece came from.
+
+---
+
+## 9. Safety and cleanup
+
+* **Never execute** unknown binaries you find. Inspect and decode text safely.
+* If you changed permissions during the investigation, revert them.
+
+Example revert command:
+
+```bash
+sudo chmod o-x /home/zeroday
+```
+
+---
+
+## 10. Appendix — Commands cheat sheet
+
+```bash
+# Services
+sudo systemctl list-units --all --type=service
+sudo systemctl status cipher.service
+sudo systemctl cat cipher.service
+
+# Users & homes
+cat /etc/passwd | cut -d: -f1,3,6,7
+ls -al /home
+sudo ls -al /home/zeroday
+sudo ls -al /home/specter
+
+# Crontab
+sudo crontab -l -u root
+sudo crontab -l -u zeroday
+ls -al /var/spool/cron/crontabs /etc/cron*
+
+# MOTD
+ls -al /etc/update-motd.d/
+sudo cat /etc/update-motd.d/00-header
+
+# Quick decoding (CLI alternatives to CyberChef)
+echo "BASE64STRING" | base64 -d
+echo "HEXSTRING" | xxd -r -p
+echo "HEXSTRING" | xxd -r -p | base64 -d
+```
+
+---
+
+*End of documentation.*
